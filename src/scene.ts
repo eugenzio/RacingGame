@@ -4,6 +4,8 @@ export class GameScene {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
+  sun: THREE.DirectionalLight | null = null;
+  sunOffset: THREE.Vector3 = new THREE.Vector3(50, 100, 50);
 
   constructor() {
     // 1. Scene
@@ -38,22 +40,31 @@ export class GameScene {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-    dirLight.position.set(50, 100, 50);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 200;
+    this.sun = new THREE.DirectionalLight(0xffffff, 1);
+    this.sun.position.copy(this.sunOffset);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.width = 2048;
+    this.sun.shadow.mapSize.height = 2048;
+    this.sun.shadow.camera.near = 0.5;
+    this.sun.shadow.camera.far = 200;
+    this.sun.shadow.bias = -0.0005; // Fix acne
     
     // Optimize shadow frustum for the track area
     const d = 50;
-    dirLight.shadow.camera.left = -d;
-    dirLight.shadow.camera.right = d;
-    dirLight.shadow.camera.top = d;
-    dirLight.shadow.camera.bottom = -d;
+    this.sun.shadow.camera.left = -d;
+    this.sun.shadow.camera.right = d;
+    this.sun.shadow.camera.top = d;
+    this.sun.shadow.camera.bottom = -d;
 
-    this.scene.add(dirLight);
+    this.scene.add(this.sun);
+  }
+  
+  updateSunPosition(target: THREE.Vector3) {
+      if (this.sun) {
+          this.sun.position.copy(target).add(this.sunOffset);
+          this.sun.target.position.copy(target);
+          this.sun.target.updateMatrixWorld();
+      }
   }
 
   private onWindowResize() {

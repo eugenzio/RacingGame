@@ -3,11 +3,99 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>F1 Racer</title>
+    <title>F1 Racing Simulator</title>
     <style>
-      body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-      canvas { display: block; }
+      @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,400;0,700;1,900&display=swap');
       
+      body { margin: 0; overflow: hidden; font-family: 'Titillium Web', sans-serif; background: #000; }
+      canvas { display: block; position: absolute; top: 0; left: 0; z-index: 0; }
+      
+      /* UI UTILS */
+      .ui-panel {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        display: flex; flex-direction: column;
+        justify-content: center; align-items: center;
+        z-index: 1000;
+        color: white;
+        text-align: center;
+        background: #000000; /* Solid opaque black */
+      }
+
+      h1 {
+        font-size: 100px;
+        margin: 0;
+        font-style: italic;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: -2px;
+        color: #fff;
+        text-shadow: 4px 4px #e10600; /* F1 Red */
+      }
+
+      .f1-btn {
+        padding: 15px 50px;
+        font-size: 24px;
+        font-weight: 700;
+        font-family: 'Titillium Web', sans-serif;
+        font-style: italic;
+        background: transparent;
+        color: white;
+        border: 2px solid white;
+        border-radius: 5px; /* Rounded corners standard in modern F1 UI */
+        border-bottom-right-radius: 20px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-transform: uppercase;
+        margin-top: 20px;
+      }
+
+      .f1-btn:hover {
+        background: #e10600;
+        border-color: #e10600;
+        transform: scale(1.05) skew(-10deg);
+      }
+
+      .lap-control {
+        margin: 30px 0;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        font-size: 24px;
+        font-weight: bold;
+        background: rgba(255,255,255,0.1);
+        padding: 15px 30px;
+        border-radius: 10px;
+        border-left: 5px solid #e10600;
+      }
+
+      .lap-input {
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid white;
+        color: #e10600;
+        font-size: 30px;
+        font-weight: 900;
+        width: 60px;
+        text-align: center;
+        font-family: 'Titillium Web', sans-serif;
+      }
+      .lap-input:focus { outline: none; }
+
+      #credits {
+        position: absolute;
+        bottom: 20px;
+        right: 30px;
+        font-size: 14px;
+        color: #666;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        border-right: 3px solid #e10600;
+        padding-right: 10px;
+      }
+
+      /* HUD & DASHBOARD */
       #dashboard-container {
         position: absolute;
         bottom: 0;
@@ -22,24 +110,26 @@
         justify-content: flex-end;
         align-items: center;
         padding-bottom: 20px;
+        z-index: 100;
       }
 
       #rpm-bar-container {
         width: 80%;
         height: 15px;
         background: #333;
-        border-radius: 8px;
+        border-radius: 4px;
         margin-bottom: 10px;
         overflow: hidden;
         border: 1px solid #555;
         position: relative;
+        transform: skew(-10deg);
       }
 
       #rpm-bar {
         width: 0%;
         height: 100%;
         background: linear-gradient(90deg, #00ff00 0%, #ffff00 60%, #ff0000 100%);
-        transition: width 0.1s linear;
+        transition: width 0.05s linear;
       }
 
       #cluster {
@@ -49,21 +139,18 @@
         color: white;
       }
 
-      .gauge {
-        text-align: center;
-      }
-
       #speed-val {
         font-size: 64px;
         font-weight: 800;
         font-variant-numeric: tabular-nums;
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        font-style: italic;
       }
 
       #speed-label {
         font-size: 14px;
-        color: #aaa;
+        color: #e10600;
         letter-spacing: 2px;
+        font-weight: bold;
       }
 
       #gear-box {
@@ -75,12 +162,14 @@
         justify-content: center;
         align-items: center;
         border-radius: 10px;
+        transform: skew(-10deg);
       }
 
       #gear-val {
         font-size: 36px;
         font-weight: bold;
         color: #ffcc00;
+        transform: skew(10deg);
       }
 
       #fps {
@@ -89,95 +178,110 @@
         right: 10px;
         color: #444;
         font-size: 10px;
+        z-index: 100;
       }
 
       #lap-timer-container {
         position: absolute;
         top: 20px;
         left: 20px;
-        background: rgba(0, 0, 0, 0.6);
-        padding: 10px 20px;
-        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 15px 25px;
+        border-bottom-right-radius: 15px;
         color: white;
-        border-left: 4px solid #00ff00;
+        border-left: 4px solid #e10600;
         font-variant-numeric: tabular-nums;
+        transform: skew(-10deg);
+        z-index: 100;
       }
-
-      #current-time-label {
-        font-size: 12px;
-        color: #aaa;
-        text-transform: uppercase;
-        margin-bottom: 2px;
-      }
+      
+      /* Fix skew for text inside */
+      #lap-timer-container > * { transform: skew(10deg); }
 
       #current-time {
         font-size: 32px;
         font-weight: bold;
         letter-spacing: 1px;
       }
-
-      #last-lap {
-        margin-top: 5px;
+      
+      #lap-counter {
+        color: #e10600;
+        font-weight: 900;
         font-size: 14px;
-        color: #ddd;
+        margin-bottom: 5px;
+      }
+
+      /* Results Screen */
+      #results-screen {
+        display: none;
       }
       
-      #best-lap {
-        font-size: 14px;
-        color: #ffcc00;
+      #final-time-display {
+        font-size: 80px; 
+        color: #ffcc00; 
+        font-weight: 900; 
+        margin: 20px 0;
       }
+
     </style>
   </head>
   <body>
-    <div id="lobby-screen" style="
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.9)), url('https://images.unsplash.com/photo-1533130061792-64b345e4a833?auto=format&fit=crop&q=80&w=1920');
-      background-size: cover;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      color: white;
-      text-align: center;
-    ">
-      <h1 style="font-size: 80px; margin-bottom: 0; font-style: italic; letter-spacing: -4px;">F1 RACER</h1>
-      <p style="font-size: 18px; color: #aaa; margin-bottom: 40px; letter-spacing: 2px;">TIME ATTACK CHALLENGE</p>
+    <!-- LOBBY -->
+    <div id="lobby-screen" class="ui-panel">
+      <h1>F1 SIMULATOR</h1>
+      <p style="font-size: 18px; color: #ccc; letter-spacing: 4px; margin-top: -10px; margin-bottom: 40px;">OFFICIAL RACING EXPERIENCE</p>
       
-      <button id="start-button" style="
-        padding: 20px 60px;
-        font-size: 24px;
-        font-weight: bold;
-        background: #dc0000;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: all 0.2s;
-        box-shadow: 0 5px 15px rgba(220, 0, 0, 0.4);
-        text-transform: uppercase;
-        letter-spacing: 2px;
-      " onmouseover="this.style.background='#ff0000'; this.style.transform='scale(1.05)'" 
-         onmouseout="this.style.background='#dc0000'; this.style.transform='scale(1)'">Start Race</button>
+      <div class="lap-control">
+        <span>RACE LAPS</span>
+        <input type="number" id="lap-input" class="lap-input" value="3" min="1" max="50">
+      </div>
 
-      <div style="margin-top: 50px; display: flex; gap: 40px;">
+      <button id="start-button" class="f1-btn">RACE START</button>
+
+      <div style="margin-top: 60px; display: flex; gap: 60px; text-align: left;">
         <div>
-          <div style="font-size: 12px; color: #888;">STEER</div>
-          <div style="font-size: 20px; font-weight: bold;">WASD / ARROWS</div>
+          <div style="font-size: 12px; color: #888;">DRIVE</div>
+          <div style="font-size: 20px; font-weight: bold;">WASD</div>
+        </div>
+        <div>
+          <div style="font-size: 12px; color: #888;">VIEW</div>
+          <div style="font-size: 20px; font-weight: bold;">C KEY</div>
         </div>
         <div>
           <div style="font-size: 12px; color: #888;">RESET</div>
           <div style="font-size: 20px; font-weight: bold;">R KEY</div>
         </div>
       </div>
+
+      <div id="credits">Made by Eugene Cha</div>
     </div>
 
+    <!-- RESULTS -->
+    <div id="results-screen" class="ui-panel">
+      <h1 style="font-size: 60px;">RACE FINISHED</h1>
+      <p style="color: #aaa; letter-spacing: 2px;">TOTAL TIME</p>
+      <div id="final-time-display">00:00.000</div>
+      <button id="restart-button" class="f1-btn">BACK TO START PAGE</button>
+      <div id="credits">Made by Eugene Cha</div>
+    </div>
+
+    <!-- HUD -->
     <div id="fps">FPS: 60</div>
     
+    <div id="countdown" style="
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 120px;
+      font-weight: 900;
+      color: white;
+      text-shadow: 0 0 20px rgba(0,0,0,0.5);
+      pointer-events: none;
+      display: none;
+      z-index: 100;
+    "></div>
+
     <div id="start-lights" style="
       position: absolute;
       top: 30%;
@@ -199,7 +303,7 @@
     </div>
     
     <div id="lap-timer-container">
-      <div id="current-time-label">Current Lap</div>
+      <div id="lap-counter">LAP 1 / 3</div>
       <div id="current-time">00:00.000</div>
       <div id="last-lap">Last: --:--.---</div>
       <div id="best-lap">Best: --:--.---</div>
@@ -217,7 +321,7 @@
         </div>
 
         <div id="gear-box">
-          <div id="gear-val">1</div>
+          <div id="gear-val">N</div>
         </div>
       </div>
     </div>

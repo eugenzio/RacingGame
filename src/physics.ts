@@ -5,7 +5,8 @@ export class PhysicsEngine {
   eventQueue: RAPIER.EventQueue;
 
   constructor(gravity = { x: 0, y: -9.81, z: 0 }) {
-    this.world = new RAPIER.World(gravity);
+    const g = new RAPIER.Vector3(gravity.x, gravity.y, gravity.z);
+    this.world = new RAPIER.World(g);
     this.eventQueue = new RAPIER.EventQueue();
   }
 

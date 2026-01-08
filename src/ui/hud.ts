@@ -6,6 +6,7 @@ export class HUD {
     currentTimeElement: HTMLElement | null;
     lastLapElement: HTMLElement | null;
     bestLapElement: HTMLElement | null;
+    lapCounterElement: HTMLElement | null;
   
     constructor() {
       this.speedElement = document.getElementById('speed-val');
@@ -15,12 +16,19 @@ export class HUD {
       this.currentTimeElement = document.getElementById('current-time');
       this.lastLapElement = document.getElementById('last-lap');
       this.bestLapElement = document.getElementById('best-lap');
+      this.lapCounterElement = document.getElementById('lap-counter');
     }
 
     updateLapTimes(current: number, last: number, best: number) {
         if (this.currentTimeElement) this.currentTimeElement.textContent = this.formatTime(current);
         if (this.lastLapElement && last > 0) this.lastLapElement.textContent = `Last: ${this.formatTime(last)}`;
         if (this.bestLapElement && best < Infinity) this.bestLapElement.textContent = `Best: ${this.formatTime(best)}`;
+    }
+
+    updateLapCounter(current: number, total: number) {
+        if (this.lapCounterElement) {
+            this.lapCounterElement.textContent = `LAP ${current} / ${total}`;
+        }
     }
 
     private formatTime(ms: number): string {

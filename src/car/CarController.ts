@@ -85,6 +85,30 @@ export class CarController {
     body.setAngvel(new RAPIER.Vector3(angVel.x * 0.5, angVel.y * 0.95, angVel.z * 0.5), true);
   }
 
+  updateCoasting(dt: number) {
+    const body = this.car.rigidBody;
+    const rot = body.rotation();
+    const quaternion = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
+    
+    // Local basis vectors
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(quaternion);
+
+    // Current Velocity
+    const velRaw = body.linvel();
+    const velocity = new THREE.Vector3(velRaw.x, velRaw.y, velRaw.z);
+    const localVelocity = velocity.clone().applyQuaternion(quaternion.clone().invert());
+
+    // Lateral Grip (still applied to prevent spinning out wildly)
+    const sideVel = localVelocity.x;
+    const gripForce = -sideVel * this.gripFactor * body.mass() * dt;
+    const lateralImpulse = right.clone().multiplyScalar(gripForce);
+    body.applyImpulse(lateralImpulse, true);
+
+    // Angular Damping
+    const angVel = body.angvel();
+    body.setAngvel(new RAPIER.Vector3(angVel.x * 0.5, angVel.y * 0.95, angVel.z * 0.5), true);
+  }
+
   getSpeedKmH(): number {
     const vel = this.car.rigidBody.linvel();
     const speedMs = Math.sqrt(vel.x*vel.x + vel.y*vel.y + vel.z*vel.z);

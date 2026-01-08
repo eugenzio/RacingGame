@@ -4,6 +4,7 @@ export class InputManager {
   left = false;
   right = false;
   reset = false;
+  changeView = false;
 
   constructor() {
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -31,6 +32,9 @@ export class InputManager {
       case 'KeyR':
         this.reset = true;
         break;
+      case 'KeyC':
+        this.changeView = true;
+        break;
     }
   }
 
@@ -54,6 +58,9 @@ export class InputManager {
         break;
       case 'KeyR':
         this.reset = false;
+        break;
+      case 'KeyC':
+        this.changeView = false;
         break;
     }
   }
