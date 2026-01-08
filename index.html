@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>F1 Racer</title>
+    <style>
+      body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+      canvas { display: block; }
+      
+      #dashboard-container {
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        height: 180px;
+        pointer-events: none;
+        background: radial-gradient(circle at center bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 70%);
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        padding-bottom: 20px;
+      }
+
+      #rpm-bar-container {
+        width: 80%;
+        height: 15px;
+        background: #333;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        overflow: hidden;
+        border: 1px solid #555;
+        position: relative;
+      }
+
+      #rpm-bar {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #00ff00 0%, #ffff00 60%, #ff0000 100%);
+        transition: width 0.1s linear;
+      }
+
+      #cluster {
+        display: flex;
+        align-items: center;
+        gap: 40px;
+        color: white;
+      }
+
+      .gauge {
+        text-align: center;
+      }
+
+      #speed-val {
+        font-size: 64px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+      }
+
+      #speed-label {
+        font-size: 14px;
+        color: #aaa;
+        letter-spacing: 2px;
+      }
+
+      #gear-box {
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        width: 60px;
+        height: 60px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 10px;
+      }
+
+      #gear-val {
+        font-size: 36px;
+        font-weight: bold;
+        color: #ffcc00;
+      }
+
+      #fps {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        color: #444;
+        font-size: 10px;
+      }
+
+      #lap-timer-container {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 10px 20px;
+        border-radius: 8px;
+        color: white;
+        border-left: 4px solid #00ff00;
+        font-variant-numeric: tabular-nums;
+      }
+
+      #current-time-label {
+        font-size: 12px;
+        color: #aaa;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+      }
+
+      #current-time {
+        font-size: 32px;
+        font-weight: bold;
+        letter-spacing: 1px;
+      }
+
+      #last-lap {
+        margin-top: 5px;
+        font-size: 14px;
+        color: #ddd;
+      }
+      
+      #best-lap {
+        font-size: 14px;
+        color: #ffcc00;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="lobby-screen" style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.9)), url('https://images.unsplash.com/photo-1533130061792-64b345e4a833?auto=format&fit=crop&q=80&w=1920');
+      background-size: cover;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      color: white;
+      text-align: center;
+    ">
+      <h1 style="font-size: 80px; margin-bottom: 0; font-style: italic; letter-spacing: -4px;">F1 RACER</h1>
+      <p style="font-size: 18px; color: #aaa; margin-bottom: 40px; letter-spacing: 2px;">TIME ATTACK CHALLENGE</p>
+      
+      <button id="start-button" style="
+        padding: 20px 60px;
+        font-size: 24px;
+        font-weight: bold;
+        background: #dc0000;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 5px 15px rgba(220, 0, 0, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      " onmouseover="this.style.background='#ff0000'; this.style.transform='scale(1.05)'" 
+         onmouseout="this.style.background='#dc0000'; this.style.transform='scale(1)'">Start Race</button>
+
+      <div style="margin-top: 50px; display: flex; gap: 40px;">
+        <div>
+          <div style="font-size: 12px; color: #888;">STEER</div>
+          <div style="font-size: 20px; font-weight: bold;">WASD / ARROWS</div>
+        </div>
+        <div>
+          <div style="font-size: 12px; color: #888;">RESET</div>
+          <div style="font-size: 20px; font-weight: bold;">R KEY</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="fps">FPS: 60</div>
+    
+    <div id="start-lights" style="
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      gap: 20px;
+      padding: 30px;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 15px;
+      z-index: 100;
+      border: 2px solid #444;
+    ">
+      <div class="light" style="width: 60px; height: 60px; border-radius: 50%; background: #222; border: 4px solid #000; transition: background 0.1s;"></div>
+      <div class="light" style="width: 60px; height: 60px; border-radius: 50%; background: #222; border: 4px solid #000; transition: background 0.1s;"></div>
+      <div class="light" style="width: 60px; height: 60px; border-radius: 50%; background: #222; border: 4px solid #000; transition: background 0.1s;"></div>
+      <div class="light" style="width: 60px; height: 60px; border-radius: 50%; background: #222; border: 4px solid #000; transition: background 0.1s;"></div>
+      <div class="light" style="width: 60px; height: 60px; border-radius: 50%; background: #222; border: 4px solid #000; transition: background 0.1s;"></div>
+    </div>
+    
+    <div id="lap-timer-container">
+      <div id="current-time-label">Current Lap</div>
+      <div id="current-time">00:00.000</div>
+      <div id="last-lap">Last: --:--.---</div>
+      <div id="best-lap">Best: --:--.---</div>
+    </div>
+    
+    <div id="dashboard-container">
+      <div id="rpm-bar-container">
+        <div id="rpm-bar"></div>
+      </div>
+      
+      <div id="cluster">
+        <div class="gauge">
+          <div id="speed-val">0</div>
+          <div id="speed-label">KM/H</div>
+        </div>
+
+        <div id="gear-box">
+          <div id="gear-val">1</div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
