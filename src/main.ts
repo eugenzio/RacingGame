@@ -7,8 +7,11 @@ import { InputManager } from './input/InputManager';
 import { HUD } from './ui/hud';
 import { SoundManager } from './audio/SoundManager';
 import { MapManager } from './maps/MapManager';
+import { UIManager } from './ui/UIManager';
 import * as THREE from 'three';
+import { io, Socket } from 'socket.io-client';
 
+// The heartbeat of the game.
 class Game {
   physics: PhysicsEngine;
   scene: GameScene;
@@ -19,8 +22,32 @@ class Game {
   input: InputManager;
   hud: HUD;
   sound: SoundManager;
+  uiManager: UIManager;
 
-  // Time
+  // Multiplayer
+  socket: Socket | null = null;
+  remoteCars: Map<string, Car> = new Map();
+  lastEmitTime: number = 0;
+  
+  // Game State
+  isRacing = false;
+  raceFinished = false;
+  
+  // Lap Logic
+  totalLaps = 3;
+  currentLap = 1;
+  lapStartTime = 0;
+  lastLapTime = 0;
+  bestLapTime = Infinity;
+  currentLapTime = 0;
+  lapStarted = false;
+  halfwayPointReached = false;
+  lastCarZ = 0;
+  wasCHeld = false;
+  
+  // Physics Timing (Fixed Timestep)
+  // Accumulator logic for time stepping – standard GafferOnGames approach.
+  // Crucial for deterministic physics even if frame rate drops.
   lastTime = 0;
   physicsAccumulator = 0;
   fixedTimeStep = 1 / 60;
@@ -28,25 +55,7 @@ class Game {
   // FPS
   frameCount = 0;
   lastFpsTime = 0;
-
-  // Lap Timer
-  lapStartTime = 0;
-  lastLapTime = 0;
-  bestLapTime = Infinity;
-  currentLapTime = 0;
-  lapStarted = false;
-  isRacing = false;
-  isStarting = false;
-  
-  // Race Logic
-  totalLaps = 3;
-  currentLap = 1;
   raceStartTime = 0;
-  raceFinished = false;
-  
-  halfwayPointReached = false;
-  lastCarZ = 0;
-  wasCHeld = false;
 
   constructor() {
     this.scene = new GameScene();
@@ -59,10 +68,13 @@ class Game {
     this.controller = null!;
     this.camera = null!;
     this.mapManager = null!;
+    this.uiManager = null!;
   }
 
   async init() {
     console.log("Initializing Game...");
+    
+    // 1. Initialize Physics & Map (Background loading)
     try {
         console.log("Initializing Physics...");
         await PhysicsEngine.init();
@@ -73,10 +85,12 @@ class Game {
 
         this.mapManager = new MapManager(this.scene.scene, this.physics);
         console.log("Loading Map...");
+        // Default map for the background visuals while in menu
         const mapData = await this.mapManager.loadMap('standard');
         console.log("Map Loaded.");
 
-        this.car = new Car(this.scene.scene, this.physics, mapData.spawnPosition);
+        // Create Local Car (Visuals + Physics)
+        this.car = new Car(this.scene.scene, this.physics, mapData.spawnPosition, false);
         if (mapData.spawnRotation) {
             this.car.rigidBody.setRotation(mapData.spawnRotation, true);
         }
@@ -85,55 +99,81 @@ class Game {
         this.controller = new CarController(this.car, this.input);
         this.camera = new FollowCamera(this.scene.camera, this.car.mesh);
 
-        this.setupUI();
+        // 2. Connect to Server (Optional until multiplayer selected, but doing it early for now)
+        // this.initSocket();
+
+        // 3. Setup UI Listeners
+        this.uiManager = new UIManager('#ui-root', (config) => {
+            this.handleGameStart(config);
+        });
         console.log("UI Setup complete. Starting loop.");
+
+        // 4. Start Render Loop
         requestAnimationFrame(this.loop);
+        
     } catch (e) {
         console.error("Game Init Failed:", e);
         alert("Game failed to initialize. See console for details.\n" + e);
     }
   }
 
-  setupUI() {
-    const startBtn = document.getElementById('start-button');
-    if (startBtn) {
-        startBtn.addEventListener('click', () => {
-            const lapInput = document.getElementById('lap-input') as HTMLInputElement;
-            if (lapInput) {
-                const laps = lapInput.valueAsNumber;
-                if (!isNaN(laps) && laps > 0) {
-                    this.totalLaps = laps;
-                    this.hud.updateLapCounter(this.currentLap, this.totalLaps);
-                }
-            }
-            
-            const lobby = document.getElementById('lobby-screen');
-            if (lobby) lobby.style.display = 'none';
-            
-            // Init Sound
-            this.sound.init();
-            this.sound.startEngine();
+  handleGameStart(config: any) {
+      console.log('Starting Game with config:', config);
+      
+      // If multiplayer, we hook up the socket events now
+      if (config.mode === 'MULTI') {
+          this.initSocket();
+          // join room logic would go here ideally
+          if (config.roomCode) {
+              this.socket?.emit('joinRoom', config.roomCode);
+          } else if (config.isHost) {
+              // already created via stub, just connect socket logic
+          }
+      }
 
-            startBtn.blur();
-            this.startSequence();
-        });
-    }
+      // Map switching could happen here:
+      // if (config.map !== 'standard') this.mapManager.loadMap(config.map)...
 
-    const restartBtn = document.getElementById('restart-button');
-    if (restartBtn) {
-        restartBtn.addEventListener('click', () => {
-            window.location.reload();
-        });
-    }
+      this.startSequence();
+  }
+
+  initSocket() {
+    if (this.socket) return;
+    this.socket = io('http://localhost:3000');
+
+    this.socket.on('connect', () => {
+        console.log('Connected to server:', this.socket?.id);
+    });
+
+    this.socket.on('playerMoved', (data) => {
+        if (this.remoteCars.has(data.id)) {
+            const car = this.remoteCars.get(data.id);
+            // Interpolate remote cars smoothly
+            car?.updateRemoteState(
+                { x: data.x, y: data.y, z: data.z },
+                { x: data.qx, y: data.qy, z: data.qz, w: data.qw }
+            );
+        }
+    });
+
+    this.socket.on('newPlayer', (info) => {
+        this.addRemoteCar(info.id, info);
+    });
+
+    this.socket.on('playerDisconnected', (id) => {
+        this.removeRemoteCar(id);
+    });
   }
 
   startSequence() {
+      // Init Sound
+      this.sound.init();
+      this.sound.startEngine();
+
       const lightsContainer = document.getElementById('start-lights');
       if (lightsContainer) {
           lightsContainer.style.display = 'flex';
           const lights = lightsContainer.querySelectorAll('.light');
-          
-          // Reset lights
           lights.forEach((l: any) => l.style.background = '#222');
 
           let step = 0;
@@ -149,12 +189,11 @@ class Game {
                   setTimeout(() => {
                       lights.forEach((l: any) => l.style.background = '#222');
                       lightsContainer.style.display = 'none';
-                      this.startGame();
-                  }, Math.random() * 1000 + 500); // Random delay 0.5 - 1.5s
+                      this.startGame(); 
+                  }, Math.random() * 1000 + 500);
               }
           }, 1000);
       } else {
-          // Fallback if no lights UI
           this.startGame();
       }
   }
@@ -168,26 +207,47 @@ class Game {
       this.hud.updateLapCounter(this.currentLap, this.totalLaps);
   }
 
+  addRemoteCar(id: string, info: any) {
+      const newCar = new Car(this.scene.scene, this.physics, {x: info.x, y: info.y, z: info.z}, true);
+      this.remoteCars.set(id, newCar);
+  }
+
+  removeRemoteCar(id: string) {
+    if (this.remoteCars.has(id)) {
+      const carToRemove = this.remoteCars.get(id);
+      if (carToRemove) {
+        this.scene.scene.remove(carToRemove.mesh);
+      }
+      this.remoteCars.delete(id);
+    }
+  }
+
   loop = (time: number) => {
     requestAnimationFrame(this.loop);
     
     const dt = (time - this.lastTime) / 1000;
     this.lastTime = time;
-    const safeDt = Math.min(dt, 0.1);
+    const safeDt = Math.min(dt, 0.1); // Prevent huge jumps if tab is inactive
 
+    // Fixed timestep for physics (essential for stability!)
     this.physicsAccumulator += safeDt;
     while (this.physicsAccumulator >= this.fixedTimeStep) {
+        // Save state for interpolation BEFORE stepping
         if (this.car) this.car.saveState();
         this.physics.step(this.fixedTimeStep);
         this.physicsAccumulator -= this.fixedTimeStep;
     }
     
     if (this.car) {
+        // Interpolate visual mesh between previous physics state and current one
+        // eliminating the jitter.
         this.car.update(this.physicsAccumulator / this.fixedTimeStep);
-        // Shadows follow car
         this.scene.updateSunPosition(this.car.mesh.position);
         
-        if (this.isRacing) {
+        // Background rotation if not racing (Menu Mode)
+        if (!this.isRacing && !this.raceFinished) {
+             this.sound.updateEngine(0); // Idle
+        } else {
             if (!this.raceFinished) {
                 this.controller.update(safeDt);
             } else {
@@ -196,16 +256,23 @@ class Game {
             
             const speed = this.controller.getSpeedKmH();
             this.hud.updateSpeed(speed);
-            
-            // Engine Sound
-            // Normalize RPM approx based on speed (0-300kmh -> 0-1)
             const rpm = Math.min(Math.abs(speed) / 320, 1.0);
             this.sound.updateEngine(rpm);
-        } else {
-             // Idle sound
-             this.sound.updateEngine(0);
+        }
+
+        // Throttle network updates to ~30hz to save bandwidth
+        if (this.socket && this.isRacing && (Date.now() - this.lastEmitTime > 30)) {
+             const t = this.car.rigidBody.translation();
+             const r = this.car.rigidBody.rotation();
+             this.socket.emit('playerMovement', {
+                 x: t.x, y: t.y, z: t.z,
+                 qx: r.x, qy: r.y, qz: r.z, qw: r.w
+             });
+             this.lastEmitTime = Date.now();
         }
     }
+
+    this.remoteCars.forEach(car => car.update());
     
     if (this.isRacing) {
       if (this.lapStarted) {
@@ -247,7 +314,6 @@ class Game {
 
       // Finish Line at Z=50
       // Driving direction: 60 -> 50 -> -100.
-      // So we cross when decreasing past 50.
       if (this.lastCarZ > 50 && currentZ <= 50 && this.halfwayPointReached) {
           this.onCrossFinishLine();
       }
@@ -278,11 +344,7 @@ class Game {
 
   finishRace(now: number) {
       this.raceFinished = true;
-      // Note: isRacing remains true so physics continues (car coasts)
-      
       const totalTimeMs = now - this.raceStartTime;
-      
-      // Camera Zoom Out
       this.camera.startVictorySequence();
 
       const minutes = Math.floor(totalTimeMs / 60000);

@@ -1,0 +1,173 @@
+/* src/ui/styles/ui.css */
+@import url('https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,400;0,700;1,900&display=swap');
+
+#ui-root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Let clicks pass through to canvas when UI hidden */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Titillium Web', sans-serif;
+  overflow: hidden;
+  z-index: 2000;
+}
+
+.screen {
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  padding: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 4px solid #e10600; /* F1 Red */
+  text-align: center;
+  min-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  transform: skewX(-5deg);
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  position: absolute;
+}
+
+.screen.active {
+  opacity: 1;
+  transform: skewX(-5deg) scale(1);
+}
+
+.screen.hidden {
+  pointer-events: none;
+  display: none;
+}
+
+/* Correct skew for text inside */
+.screen > * {
+  transform: skewX(5deg);
+}
+
+h1 {
+  font-size: 48px;
+  font-weight: 900;
+  margin: 0;
+  font-style: italic;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+h2 {
+  font-size: 24px;
+  color: #ccc;
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 100%;
+}
+
+.btn {
+  background: transparent;
+  border: 2px solid white;
+  color: white;
+  padding: 15px;
+  font-size: 20px;
+  font-weight: 700;
+  font-family: inherit;
+  text-transform: uppercase;
+  font-style: italic;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn:hover, .btn:focus {
+  background: #e10600;
+  border-color: #e10600;
+  transform: scale(1.05);
+  outline: none;
+}
+
+.btn-secondary {
+  border-color: #666;
+  color: #aaa;
+  font-size: 16px;
+  padding: 10px;
+}
+
+.btn-secondary:hover, .btn-secondary:focus {
+  background: #333;
+  border-color: #fff;
+  color: #fff;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  text-align: left;
+}
+
+label {
+  font-size: 14px;
+  color: #e10600;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #444;
+  color: white;
+  font-family: inherit;
+  font-size: 18px;
+  box-sizing: border-box;
+}
+
+input:focus, select:focus {
+  border-color: #e10600;
+  outline: none;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.message {
+  font-size: 16px;
+  color: #aaa;
+  margin-top: 10px;
+  min-height: 24px;
+}
+
+.map-list {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.map-card {
+  border: 1px solid #444;
+  padding: 20px;
+  cursor: pointer;
+  flex: 1;
+  transition: all 0.2s;
+  background: rgba(0,0,0,0.5);
+}
+
+.map-card:hover, .map-card.selected {
+  border-color: #e10600;
+  background: rgba(225, 6, 0, 0.2);
+}

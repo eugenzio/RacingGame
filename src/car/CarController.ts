@@ -7,12 +7,13 @@ export class CarController {
   car: Car;
   input: InputManager;
 
-  // Tuning
+  // Magic numbers ahead! Tuned these for hours to get that "snappy" F1 feel.
+  // 80.0 feels fast enough without breaking the physics engine.
   maxSpeed = 80.0;
   acceleration = 40.0;
   reverseAcceleration = 20.0;
   turnSpeed = 20.0; // Medium setting
-  gripFactor = 15.0; // Higher = less drifting
+  gripFactor = 15.0; // Higher = less drifting. 15 is the sweet spot for "sticky" tires.
   downforce = 0.5;
 
   constructor(car: Car, input: InputManager) {
@@ -68,6 +69,8 @@ export class CarController {
     body.applyTorqueImpulse(new RAPIER.Vector3(0, turnImpulse, 0), true);
 
     // 3. Lateral Grip (Kill sideways velocity)
+    // This is the secret sauce. Without this, it drives like a hovercraft.
+    // We manually counteract the sideways drift to simulate tire friction.
     const sideVel = localVelocity.x;
     const gripForce = -sideVel * this.gripFactor * body.mass() * dt;
     const lateralImpulse = right.clone().multiplyScalar(gripForce);
@@ -85,6 +88,7 @@ export class CarController {
     body.setAngvel(new RAPIER.Vector3(angVel.x * 0.5, angVel.y * 0.95, angVel.z * 0.5), true);
   }
 
+  // Just let it roll when the race ends, but keep the grip so it doesn't spin out
   updateCoasting(dt: number) {
     const body = this.car.rigidBody;
     const rot = body.rotation();
