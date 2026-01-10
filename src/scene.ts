@@ -29,6 +29,9 @@ export class GameScene {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(this.renderer.domElement);
 
+    // Hide canvas until race starts
+    this.renderer.domElement.style.display = 'none';
+
     // 4. Lights
     this.setupLights();
 
@@ -71,6 +74,10 @@ export class GameScene {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  showCanvas() {
+    this.renderer.domElement.style.display = 'block';
   }
 
   render() {

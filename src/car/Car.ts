@@ -4,8 +4,14 @@ import { PhysicsEngine } from '../physics';
 
 export class Car {
   mesh: THREE.Group;
-  rigidBody: RAPIER.RigidBody;
-  collider: RAPIER.Collider;
+  rigidBody!: RAPIER.RigidBody;
+  collider!: RAPIER.Collider;
+  colliderHandle: number = -1;
+  isRemote: boolean;
+  playerName: string = 'Player';
+
+  // Name label (for multiplayer)
+  nameLabel: THREE.Sprite | null = null;
 
   // Interpolation state
   prevPos = new THREE.Vector3();
@@ -13,12 +19,40 @@ export class Car {
   currPos = new THREE.Vector3();
   currRot = new THREE.Quaternion();
 
-  constructor(scene: THREE.Scene, physics: PhysicsEngine, position: { x: number, y: number, z: number }) {
-    this.mesh = this.createCarMesh();
+  // Remote car target state (for network interpolation)
+  targetPos = new THREE.Vector3();
+  targetRot = new THREE.Quaternion();
+
+  constructor(scene: THREE.Scene, physics: PhysicsEngine, position: { x: number, y: number, z: number }, isRemote = false, name = 'Player', color = '#dc0000') {
+    this.isRemote = isRemote;
+    this.playerName = name;
+    this.mesh = this.createCarMesh(color);
     this.mesh.position.set(position.x, position.y, position.z);
     scene.add(this.mesh);
 
-    // Physics
+    if (isRemote) {
+      this.targetPos.set(position.x, position.y, position.z);
+
+      // Remote cars use kinematic body for collision detection
+      const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
+        .setTranslation(position.x, position.y + 0.5, position.z);
+
+      this.rigidBody = physics.world.createRigidBody(bodyDesc);
+
+      // Collider for collision with other cars
+      const colliderDesc = RAPIER.ColliderDesc.cuboid(0.8, 0.4, 2.0)
+        .setRestitution(0.5) // Bounce off
+        .setFriction(0.3);
+
+      this.collider = physics.world.createCollider(colliderDesc, this.rigidBody);
+      this.colliderHandle = this.collider.handle;
+
+      // Create name label for remote cars
+      this.createNameLabel(name);
+      return;
+    }
+
+    // Physics for local car
     // Car dimensions approx: 4m long, 1.8m wide, 1m high
     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
       .setTranslation(position.x, position.y + 0.5, position.z)
@@ -26,28 +60,75 @@ export class Car {
       .setAngularDamping(2.0); // Stabilize rotation
 
     this.rigidBody = physics.world.createRigidBody(bodyDesc);
-    
+
     // Collider - slightly smaller than visual to prevent snagging
     const colliderDesc = RAPIER.ColliderDesc.cuboid(0.8, 0.4, 2.0)
         .setFriction(0.0) // We handle friction manually in controller for better arcade drift control
-        .setRestitution(0.0) // No bouncing on ground to prevent shaking
+        .setRestitution(0.5) // Bounce off other cars
         .setMass(800) // 800kg F1 car
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
 
     this.collider = physics.world.createCollider(colliderDesc, this.rigidBody);
+    this.colliderHandle = this.collider.handle;
 
     // Init state
     this.saveState();
   }
 
+  private createNameLabel(name: string): void {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    canvas.width = 256;
+    canvas.height = 64;
+
+    context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    context.fillStyle = '#ffffff';
+    context.font = 'bold 32px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(name, canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    this.nameLabel = new THREE.Sprite(spriteMaterial);
+    this.nameLabel.scale.set(4, 1, 1);
+    this.nameLabel.position.set(0, 2.5, 0);
+    this.mesh.add(this.nameLabel);
+  }
+
   saveState() {
+    if (this.isRemote) return;
     const t = this.rigidBody.translation();
     const r = this.rigidBody.rotation();
     this.prevPos.set(t.x, t.y, t.z);
     this.prevRot.set(r.x, r.y, r.z, r.w);
   }
 
-  update(alpha: number) {
+  update(alpha = 1) {
+    if (this.isRemote) {
+      // Remote cars: smoothly interpolate toward target state
+      this.mesh.position.lerp(this.targetPos, 0.15);
+      this.mesh.quaternion.slerp(this.targetRot, 0.15);
+
+      // Update kinematic body position for collision
+      this.rigidBody.setNextKinematicTranslation({
+        x: this.mesh.position.x,
+        y: this.mesh.position.y + 0.5,
+        z: this.mesh.position.z
+      });
+      this.rigidBody.setNextKinematicRotation({
+        x: this.mesh.quaternion.x,
+        y: this.mesh.quaternion.y,
+        z: this.mesh.quaternion.z,
+        w: this.mesh.quaternion.w
+      });
+      return;
+    }
+
     // Get current physics state
     const t = this.rigidBody.translation();
     const r = this.rigidBody.rotation();
@@ -59,13 +140,18 @@ export class Car {
     this.mesh.quaternion.slerpQuaternions(this.prevRot, this.currRot, alpha);
   }
 
-  private createCarMesh(): THREE.Group {
+  updateRemoteState(pos: { x: number, y: number, z: number }, rot: { x: number, y: number, z: number, w: number }) {
+    this.targetPos.set(pos.x, pos.y, pos.z);
+    this.targetRot.set(rot.x, rot.y, rot.z, rot.w);
+  }
+
+  private createCarMesh(color: string): THREE.Group {
     const carGroup = new THREE.Group();
 
     // --- Materials ---
-    const bodyMat = new THREE.MeshStandardMaterial({ 
-        color: 0xdc0000, // Ferrari Red
-        roughness: 0.2, 
+    const bodyMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(color),
+        roughness: 0.2,
         metalness: 0.6,
         envMapIntensity: 1.0
     });

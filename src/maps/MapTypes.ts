@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PhysicsEngine } from '../../physics';
+import { PhysicsEngine } from '../physics';
 
 export interface ThemePreset {
   name: string;
