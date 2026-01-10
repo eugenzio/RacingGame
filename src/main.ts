@@ -703,6 +703,13 @@ class Game {
           const timeDisplay = document.getElementById('final-time-display');
 
           if (results) results.style.display = 'flex';
+          
+          const restartBtn = document.getElementById('restart-button');
+          if (restartBtn) {
+              restartBtn.onclick = () => {
+                  window.location.reload();
+              };
+          }
           if (timeDisplay) timeDisplay.textContent = timeStr;
 
           const dashboard = document.getElementById('dashboard-container');

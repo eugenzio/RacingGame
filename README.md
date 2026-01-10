@@ -60,12 +60,13 @@ If you want to run this locally and mess around with the physics values:
 **Why I built this:**
 I wanted to learn how to implement a deterministic game loop in the browser. Syncing the physics steps (fixed delta time) with the render loop (variable delta time) was a fun challenge.
 
-**The "Drift" Issue:**
-Getting the car to not feel like a bar of soap on ice was tricky. Rapier is a rigid body engine, so it handles collisions great, but I had to write a custom controller to simulate tires. The "lateral grip" logic in `CarController.ts` is basically manually killing sideways velocity every frame to fake friction. It works surprisingly well!
+## Release Notes
 
-**Future Plans:**
-*   Add tire wear mechanics?
-*   Maybe a proper collision damage model (parts flying off).
-*   More tracks!
+### v1.1.0 - Multiplayer Update 🏎️
+Just pushed a major update! Multiplayer mode is finally live. 
+- **Real-time Racing**: You can now race against other players.
+- **Sync**: Implemented basic state synchronization for player positions.
+
+It's a big change, so let me know if you spot any weird lag or sync issues!
 
 Enjoy the drive! 🏎️💨
